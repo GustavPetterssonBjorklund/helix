@@ -1,12 +1,10 @@
-<!-- Inline tiny node component -->
 <script lang="ts">
-	import type { Node } from '$lib/types';
 	import DraggableWrapper from './DraggableWrapper.svelte';
+	import type { AnyNode } from '$lib/types';
 
-	export let node: Node;
+	export let node: AnyNode;
 	export let scale = 1;
-
-	export let onChange: (update: Node) => void = () => {};
+	export let onChange: (node: AnyNode) => void;
 </script>
 
 <DraggableWrapper
@@ -15,9 +13,7 @@
 	scale={scale}
 	onChange={(e) => onChange({ ...node, x: e.x, y: e.y })}
 >
-	<div
-		class="cursor-pointer rounded bg-slate-700 px-2 py-1 text-xs text-white shadow select-none"
-	>
+	<div class="cursor-pointer rounded bg-slate-700 px-2 py-1 text-xs text-white shadow">
 		<slot />
 	</div>
 </DraggableWrapper>

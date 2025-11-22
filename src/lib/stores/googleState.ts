@@ -2,6 +2,7 @@ import { writable } from 'svelte/store';
 
 export const googleLoading = writable(false);
 export const googleError = writable<string | null>(null);
+export const googleDriveFileId = writable<string | null>(null);
 
 export type GoogleUser = {
 	getId: () => string;
@@ -19,5 +20,9 @@ export function throwGoogleStateError(message: string) {
 	throw new Error(message);
 }
 
-// Bindable callback for when an error occurs
-export const onGoogleStateError: (message: string) => void = throwGoogleStateError;
+export function setGoogleFileId(fileId: string) {
+	googleDriveFileId.set(fileId);
+}
+
+export const onGoogleStateError = writable<(message: string) => void>(throwGoogleStateError);
+export const onGoogleFileIdChange = writable<(fileId: string) => void>(setGoogleFileId);

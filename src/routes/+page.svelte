@@ -1,31 +1,31 @@
 <script lang="ts">
 	import Workspace from '$lib/components/workspace/Workspace.svelte';
 	import ContainerGroup from '$lib/components/workspace/ContainerGroup.svelte';
-	import DraggableWrapper from '$lib/components/workspace/DraggableWrapper.svelte';
-	import NodeComponent from '$lib/components/workspace/NodeComponent.svelte';
+	import NodeRenderer from '$lib/components/workspace/NodeRenderer.svelte';
 
 	// Google stuff
 	import SetDriveFileButton from '$lib/components/google-auth/SetDriveFileButton.svelte';
-	
+
 	import Modal from '$lib/components/generic/Modal.svelte';
-	
+
 	import type { WorkspaceState } from '$lib/types';
 	import type { PageData } from './$types';
 	import { onMount } from 'svelte';
-	import type { Container, Node } from '$lib/types';
-	
+	import type { Container, AnyNode } from '$lib/types';
+	import { get } from 'svelte/store';
+	import * as googleState from '$lib/stores/googleState';
 
 	export let data: PageData;
 	const { session } = data;
-
 
 	let x = 0;
 	let y = 0;
 	let scale = 1;
 
 	/* Workspace data */
-	let containers: Container[] = []
-	let nodes: Node[] = [];
+	let containers: Container[] = [];
+	let nodes: Array<{} & AnyNode> = [];
+	let workspaceLoading = false;
 
 	function updateContainer({
 		id,
@@ -54,11 +54,16 @@
 	let saveError: string | null = null;
 	let saveOk = false;
 
+	googleState.googleDriveFileId.subscribe((id) => {
+		if (typeof localStorage !== 'undefined' && id) {
+			fileId = id;
+			localStorage.setItem('helixWorkspaceFileId', id);
+		}
+	});
+
 	if (typeof localStorage !== 'undefined') {
 		fileId = localStorage.getItem('helixWorkspaceFileId');
 	}
-
-	fileId = '1BXdFZY4N85BnXGuglvlgfrVZAkK4lDC9'; // TEMPORARY HARD-CODED FILE ID FOR TESTING
 
 	async function saveWorkspace() {
 		if (!session?.accessToken) {
@@ -109,7 +114,7 @@
 	}
 
 	onMount(async () => {
-		// Get google drive file 
+		// Get google drive file
 		const response = await fetch(`/api/drive/get-workspace?fileId=${fileId}`);
 		console.log('Fetch workspace response:', response);
 		if (response.ok) {
@@ -185,14 +190,8 @@
 		<Workspace bind:x bind:y let:scale>
 			{#each containers as container (container.id)}
 				<ContainerGroup {container} {scale} onChange={updateContainer}>
-					{#each container.children as childId (childId)}
-						<NodeComponent
-							node={nodes.find((n) => n.id === childId)!}
-							{scale}
-							onChange={updateNode}
-						>
-						<h1>{nodes.find((n) => n.id === childId)?.label}</h1>
-					</NodeComponent>
+					{#each nodes.filter((n) => container.children.includes(n.id)) as node (node.id)}
+						<NodeRenderer {node} {scale} onChange={updateNode} />
 					{/each}
 				</ContainerGroup>
 			{/each}
