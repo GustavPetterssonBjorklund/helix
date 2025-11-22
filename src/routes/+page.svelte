@@ -1,62 +1,201 @@
-<script>
-  import {signIn, signOut} from "@auth/sveltekit/client"
-  import {page} from "$app/stores";
+<script lang="ts">
+	import Workspace from '$lib/components/workspace/Workspace.svelte';
+	import ContainerGroup from '$lib/components/workspace/ContainerGroup.svelte';
+	import DraggableWrapper from '$lib/components/workspace/DraggableWrapper.svelte';
+	import NodeComponent from '$lib/components/workspace/NodeComponent.svelte';
+
+	// Google stuff
+	import SetDriveFileButton from '$lib/components/google-auth/SetDriveFileButton.svelte';
+	
+	import Modal from '$lib/components/generic/Modal.svelte';
+	
+	import type { WorkspaceState } from '$lib/types';
+	import type { PageData } from './$types';
+	import { onMount } from 'svelte';
+	import type { Container, Node } from '$lib/types';
+	
+
+	export let data: PageData;
+	const { session } = data;
 
 
+	let x = 0;
+	let y = 0;
+	let scale = 1;
 
-  let files = [];
-  
-  function createFile() {
-    fetch('/api/drive/create', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ name: 'New File from SvelteKit' })
-    })
-    .then(response => response.json())
-    .then(data => {
-      console.log('File created:', data);
-    })
-    .catch(error => {
-      console.error('Error creating file:', error);
-    });
-  }
-  
-  function getDriveFiles() {
-    fetch('/api/drive/list')
-      .then(response => response.json())
-      .then(data => {
-        files = data.files;
-        console.log('Fetched files:', data);
-      })
-      .catch(error => {
-        console.error('Error fetching files:', error);
-      });
-  }
+	/* Workspace data */
+	let containers: Container[] = []
+	let nodes: Node[] = [];
+
+	function updateContainer({
+		id,
+		x,
+		y,
+		width,
+		height
+	}: {
+		id: string;
+		x: number;
+		y: number;
+		width: number;
+		height: number;
+	}) {
+		containers = containers.map((c) => (c.id === id ? { ...c, x, y, width, height } : c));
+	}
+
+	function updateNode({ id, x, y }: { id: string; x: number; y: number }) {
+		nodes = nodes.map((n) => (n.id === id ? { ...n, x, y } : n));
+		console.log('Updated node position:', id, x, y);
+	}
+
+	/* Save to Google Drive */
+	let fileId: string | null = null;
+	let saving = false;
+	let saveError: string | null = null;
+	let saveOk = false;
+
+	if (typeof localStorage !== 'undefined') {
+		fileId = localStorage.getItem('helixWorkspaceFileId');
+	}
+
+	fileId = '1BXdFZY4N85BnXGuglvlgfrVZAkK4lDC9'; // TEMPORARY HARD-CODED FILE ID FOR TESTING
+
+	async function saveWorkspace() {
+		if (!session?.accessToken) {
+			saveError = 'You must sign in with Google Drive first.';
+			return;
+		}
+
+		saving = true;
+		saveError = null;
+		saveOk = false;
+
+		const state: WorkspaceState = {
+			containers,
+			nodes
+		};
+
+		try {
+			const res = await fetch('/api/drive/save-workspace', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					fileId,
+					state
+				})
+			});
+
+			if (!res.ok) {
+				const text = await res.text();
+				throw new Error(text || `Save failed with ${res.status}`);
+			}
+
+			const data = (await res.json()) as { fileId?: string };
+
+			if (data.fileId) {
+				fileId = data.fileId;
+				if (typeof localStorage !== 'undefined') {
+					localStorage.setItem('helixWorkspaceFileId', fileId);
+				}
+			}
+
+			saveOk = true;
+		} catch (err) {
+			console.error(err);
+			saveError = err instanceof Error ? err.message : 'Unknown error';
+		} finally {
+			saving = false;
+		}
+	}
+
+	onMount(async () => {
+		// Get google drive file 
+		const response = await fetch(`/api/drive/get-workspace?fileId=${fileId}`);
+		console.log('Fetch workspace response:', response);
+		if (response.ok) {
+			const data = await response.json();
+			if (data.state) {
+				containers = data.state.containers;
+				nodes = data.state.nodes;
+			}
+		}
+	});
 </script>
-<h1>Welcome to SvelteKit</h1>
-<p>Visit <a href="https://kit.svelte.dev">kit.svelte.dev</a> to read the documentation</p><p>
-    {#if $page.data.session}
-        <span>
-            <small>Signed in as</small><br/>
-            <strong>{$page.data.session.user?.name ?? "User"}</strong>
-        </span>
-        <button on:click={() => signOut()} class="button">Sign out</button>
-        <button on:click={getDriveFiles} class="button">Get Google Drive Files</button>
-        <button on:click={createFile} class="button">Create Google Drive File</button>
-        {#if files.length > 0}
-            <h2>Your Google Drive Files:</h2>
-            <ul>
-                {#each files as file}
-                    <li>{file.name} (ID: {file.id})</li>
-                {/each}
-            </ul>
-        {/if}
-    {:else}
-        <span>You are not signed in</span>
-        <button on:click={() => signIn("google")}>
-            Sign In with Google
-        </button>
-    {/if}
-</p>
+
+<div class="flex min-h-screen w-full flex-col bg-slate-950">
+	<!-- Top bar -->
+	<div
+		class="flex items-center justify-between border-b border-slate-800 px-4 py-2 text-sm text-slate-100"
+	>
+		<div class="flex items-center gap-3">
+			<span class="font-semibold">Helix Workspace</span>
+			{#if session?.user?.email}
+				<span class="text-xs text-slate-400">Signed in as {session.user.email}</span>
+			{/if}
+		</div>
+
+		<div class="flex items-center gap-3">
+			<!-- Set Drive file button -->
+			<SetDriveFileButton bind:fileId {session} />
+			<!-- Sign in / out -->
+			{#if session}
+				<form method="POST" action="/auth/signout">
+					<button
+						type="submit"
+						class="rounded border border-slate-600 px-3 py-1 text-xs font-medium text-slate-100 hover:bg-slate-800"
+					>
+						Sign out
+					</button>
+				</form>
+			{:else}
+				<form method="POST" action="/auth/signin/google">
+					<button
+						type="submit"
+						class="rounded bg-sky-600 px-3 py-1 text-xs font-medium text-white hover:bg-sky-500"
+					>
+						Sign in with Google Drive
+					</button>
+				</form>
+			{/if}
+
+			<!-- Save button -->
+			<button
+				class="rounded bg-emerald-600 px-3 py-1 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+				on:click={saveWorkspace}
+				disabled={saving || !session?.accessToken}
+			>
+				{#if saving}
+					Saving…
+				{:else}
+					Save workspace
+				{/if}
+			</button>
+
+			{#if saveOk}
+				<span class="text-xs text-emerald-300">Saved</span>
+			{/if}
+			{#if saveError}
+				<span class="text-xs text-red-400">Error: {saveError}</span>
+			{/if}
+		</div>
+	</div>
+
+	<!-- Workspace area -->
+	<div class="h-screen w-full">
+		<Workspace bind:x bind:y let:scale>
+			{#each containers as container (container.id)}
+				<ContainerGroup {container} {scale} onChange={updateContainer}>
+					{#each container.children as childId (childId)}
+						<NodeComponent
+							node={nodes.find((n) => n.id === childId)!}
+							{scale}
+							onChange={updateNode}
+						>
+						<h1>{nodes.find((n) => n.id === childId)?.label}</h1>
+					</NodeComponent>
+					{/each}
+				</ContainerGroup>
+			{/each}
+		</Workspace>
+	</div>
+</div>
