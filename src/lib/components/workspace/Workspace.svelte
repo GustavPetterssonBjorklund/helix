@@ -90,6 +90,7 @@
 </script>
 
 <div
+	role="application"
 	class="relative h-full w-full touch-none overflow-hidden bg-black"
 	class:cursor-wait={loading}
 	class:cursor-grab={!loading && !isPanning}

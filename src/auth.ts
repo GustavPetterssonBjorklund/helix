@@ -9,12 +9,14 @@ export const { handle, signIn, signOut } = SvelteKitAuth({
 			clientSecret: GOOGLE_CLIENT_SECRET,
 			authorization: {
 				params: {
-					scope: ['openid', 'email', 'profile', 'https://www.googleapis.com/auth/drive.file'].join(
-						' '
-					)
-					// you can add these later if drive.file works:
-					// access_type: 'offline',
-					// prompt: 'consent'
+					scope: [
+						'openid',
+						'email',
+						'profile',
+						'https://www.googleapis.com/auth/drive.file'
+					].join(' '),
+					access_type: 'offline',
+					prompt: 'consent'
 				}
 			}
 		})

@@ -1,19 +1,33 @@
 <script lang="ts">
-	import DraggableWrapper from './DraggableWrapper.svelte';
-	import type { AnyNode } from '$lib/types';
+    import DraggableWrapper from './DraggableWrapper.svelte';
+    import type { AnyNode } from '$lib/types';
+    
+    export let node: AnyNode;
+    export let scale = 1;
+    export let onChange: (node: AnyNode) => void;
+    
+	export let doubleClick: () => void = () => {};
 
-	export let node: AnyNode;
-	export let scale = 1;
-	export let onChange: (node: AnyNode) => void;
+	function handleDoubleClick() {
+		doubleClick();
+	}
+
+    $: x = node.x;
+    $: y = node.y;
 </script>
 
 <DraggableWrapper
-	x={node.x}
-	y={node.y}
-	scale={scale}
-	onChange={(e) => onChange({ ...node, x: e.x, y: e.y })}
+    {x}
+    {y}
+    {scale}
+    onChange={(e: { x: number; y: number }) => onChange({ ...node, x: e.x, y: e.y })}
+    onDoubleClick={handleDoubleClick}
 >
-	<div class="cursor-pointer rounded bg-slate-700 px-2 py-1 text-xs text-white shadow">
-		<slot />
-	</div>
+    <div
+        class="cursor-pointer rounded bg-slate-700 px-2 py-1 text-xs text-white shadow"
+        role="button"
+		tabindex="0"
+    >
+        <slot />
+    </div>
 </DraggableWrapper>
