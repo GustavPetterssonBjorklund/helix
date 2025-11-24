@@ -8,10 +8,7 @@ export const updateLoading = writable<boolean>(false);
 
 export function createNode(node: AnyNode) {
 	updateLoading.set(true);
-	nodes.update((n) => {
-		n.push(node);
-		return n;
-	});
+	nodes.update((n) => [...n, node]);
 	updateLoading.set(false);
 }
 export function setNodes(newNodes: AnyNode[]) {
@@ -25,4 +22,12 @@ export function resetNodes() {
 	nodes.set([]);
 	nodesLoaded.set(false);
 	nodesLoading.set(false);
+}
+
+export function updateNode(updatedNode: AnyNode) {
+	updateLoading.set(true);
+	nodes.update((n) =>
+		n.map((node) => (node.id === updatedNode.id ? { ...node, ...updatedNode } : node))
+	);
+	updateLoading.set(false);
 }

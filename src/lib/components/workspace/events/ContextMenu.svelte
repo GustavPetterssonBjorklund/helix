@@ -3,10 +3,15 @@
 	import { browser } from '$app/environment';
 	import CreateNodeModal from '../modals/CreateNodeModal.svelte';
 
+	// Context menu position and state
 	export let x = 0;
 	export let y = 0;
 	export let open = false;
 	export let onClose: () => void;
+
+	// Mouse state on click for create node
+	let createNodeX = 0;
+	let createNodeY = 0;
 
 	export let showCreateNodeModal = false;
 
@@ -50,6 +55,8 @@
 		<button
 			class="w-full px-3 py-2 text-left hover:bg-slate-800"
 			on:click={() => {
+				createNodeX = x;
+				createNodeY = y;
 				showCreateNodeModal = true;
 				onClose();
 			}}
@@ -82,6 +89,8 @@
 		<CreateNodeModal
 			on:close={() => (showCreateNodeModal = false)}
 			bind:open={showCreateNodeModal}
+			initialX={createNodeX}
+			initialY={createNodeY}
 		/>
 	</div>
 {/if}

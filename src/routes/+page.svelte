@@ -2,18 +2,18 @@
 	import Workspace from '$lib/components/workspace/Workspace.svelte';
 	import ContainerGroup from '$lib/components/workspace/ContainerGroup.svelte';
 	import NodeRenderer from '$lib/components/workspace/NodeRenderer.svelte';
+	import NodeDetailsModal from '$lib/components/workspace/modals/NodeDetailsModal.svelte';
 
 	// Google stuff
 	import SetDriveFileButton from '$lib/components/google-auth/SetDriveFileButton.svelte';
-
-	import Modal from '$lib/components/generic/Modal.svelte';
 
 	import type { WorkspaceState } from '$lib/types';
 	import type { PageData } from './$types';
 	import { onMount } from 'svelte';
 	import type { Container, AnyNode } from '$lib/types';
-	import { get } from 'svelte/store';
 	import * as googleState from '$lib/stores/googleState';
+	import { nodes, setNodes } from '$lib/stores/nodes';
+	import { get } from 'svelte/store';
 
 	export let data: PageData;
 	const { session } = data;
@@ -21,10 +21,11 @@
 	let x = 0;
 	let y = 0;
 	let scale = 1;
+	let nodeModalOpen = false;
+	let selectedNode: AnyNode | null = null;
 
 	/* Workspace data */
 	let containers: Container[] = [];
-	let nodes: Array<{} & AnyNode> = [];
 	let workspaceLoading = false;
 
 	function updateContainer({
@@ -44,8 +45,16 @@
 	}
 
 	function updateNode({ id, x, y }: { id: string; x: number; y: number }) {
-		nodes = nodes.map((n) => (n.id === id ? { ...n, x, y } : n));
-		console.log('Updated node position:', id, x, y);
+		nodes.update((current) => current.map((n) => (n.id === id ? { ...n, x, y } : n)));
+	}
+
+	function handleNodeDoubleClick(node: AnyNode) {
+		selectedNode = node;
+		nodeModalOpen = true;
+	}
+
+	$: if (!nodeModalOpen && selectedNode) {
+		selectedNode = null;
 	}
 
 	/* Save to Google Drive */
@@ -77,7 +86,7 @@
 
 		const state: WorkspaceState = {
 			containers,
-			nodes
+			nodes: get(nodes)
 		};
 
 		try {
@@ -121,7 +130,7 @@
 			const data = await response.json();
 			if (data.state) {
 				containers = data.state.containers;
-				nodes = data.state.nodes;
+				setNodes(data.state.nodes);
 			}
 		}
 	});
@@ -188,13 +197,19 @@
 	<!-- Workspace area -->
 	<div class="h-screen w-full">
 		<Workspace bind:x bind:y let:scale>
-			{#each containers as container (container.id)}
-				<ContainerGroup {container} {scale} onChange={updateContainer}>
-					{#each nodes.filter((n) => container.children.includes(n.id)) as node (node.id)}
-						<NodeRenderer {node} {scale} onChange={updateNode} />
-					{/each}
-				</ContainerGroup>
-			{/each}
-		</Workspace>
+				{#each containers as container (container.id)}
+					<ContainerGroup {container} {scale} onChange={updateContainer}>
+						{#each $nodes.filter( (n) => container.children.includes(n.id) ) as node (node.id)}
+							<NodeRenderer {node} {scale} onChange={updateNode} onDoubleClick={handleNodeDoubleClick} />
+						{/each}
+					</ContainerGroup>
+				{/each}
+				<!-- Render all unassigned nodes -->
+				{#each $nodes.filter((n) => !containers.some( (c) => c.children.includes(n.id) )) as node (node.id)}
+					<NodeRenderer {node} {scale} onChange={updateNode} onDoubleClick={handleNodeDoubleClick} />
+				{/each}
+			</Workspace>
+		</div>
+
+		<NodeDetailsModal bind:open={nodeModalOpen} node={selectedNode} />
 	</div>
-</div>

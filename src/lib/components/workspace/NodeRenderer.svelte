@@ -9,9 +9,14 @@
     export let node: AnyNode;
     export let scale = 1;
     export let onChange = (_n: AnyNode) => {};
+    export let onDoubleClick: (node: AnyNode) => void = () => {};
+
+    function handleDoubleClick() {
+        onDoubleClick(node);
+    }
 </script>
 
-<NodeComponent {node} {scale} {onChange}>
+<NodeComponent {node} {scale} {onChange} doubleClick={handleDoubleClick}>
     {#if node.kind === "class"}
         <ClassNodeComponent {node} />
     {:else if node.kind === "method"}
