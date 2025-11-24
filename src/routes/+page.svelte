@@ -28,6 +28,32 @@
 	let containers: Container[] = [];
 	let workspaceLoading = false;
 
+	/**
+	 * Load workspace state from Google Drive for the given fileId.
+	 * Sets `workspaceLoading` while the request is in-flight so the
+	 * `Workspace` component shows the embedded loader.
+	 */
+	async function loadWorkspaceFromDrive(fileIdToLoad: string | null) {
+		if (!fileIdToLoad) return;
+
+		workspaceLoading = true;
+		try {
+			const response = await fetch(`/api/drive/get-workspace?fileId=${fileIdToLoad}`);
+			console.log('Fetch workspace response:', response);
+			if (response.ok) {
+				const data = await response.json();
+				if (data.state) {
+					containers = data.state.containers;
+					setNodes(data.state.nodes);
+				}
+			}
+		} catch (err) {
+			console.error('Failed to load workspace from drive', err);
+		} finally {
+			workspaceLoading = false;
+		}
+	}
+
 	function updateContainer({
 		id,
 		x,
@@ -67,6 +93,8 @@
 		if (typeof localStorage !== 'undefined' && id) {
 			fileId = id;
 			localStorage.setItem('helixWorkspaceFileId', id);
+			// When the user selects a file, fetch the workspace for it.
+			loadWorkspaceFromDrive(id);
 		}
 	});
 
@@ -123,16 +151,8 @@
 	}
 
 	onMount(async () => {
-		// Get google drive file
-		const response = await fetch(`/api/drive/get-workspace?fileId=${fileId}`);
-		console.log('Fetch workspace response:', response);
-		if (response.ok) {
-			const data = await response.json();
-			if (data.state) {
-				containers = data.state.containers;
-				setNodes(data.state.nodes);
-			}
-		}
+		// If we have a persisted file id, load its workspace
+		await loadWorkspaceFromDrive(fileId);
 	});
 </script>
 
@@ -196,20 +216,30 @@
 
 	<!-- Workspace area -->
 	<div class="h-screen w-full">
-		<Workspace bind:x bind:y let:scale>
-				{#each containers as container (container.id)}
-					<ContainerGroup {container} {scale} onChange={updateContainer}>
-						{#each $nodes.filter( (n) => container.children.includes(n.id) ) as node (node.id)}
-							<NodeRenderer {node} {scale} onChange={updateNode} onDoubleClick={handleNodeDoubleClick} />
-						{/each}
-					</ContainerGroup>
-				{/each}
-				<!-- Render all unassigned nodes -->
-				{#each $nodes.filter((n) => !containers.some( (c) => c.children.includes(n.id) )) as node (node.id)}
-					<NodeRenderer {node} {scale} onChange={updateNode} onDoubleClick={handleNodeDoubleClick} />
-				{/each}
-			</Workspace>
-		</div>
-
-		<NodeDetailsModal bind:open={nodeModalOpen} node={selectedNode} />
+		<Workspace bind:x bind:y let:scale loading={workspaceLoading}>
+			{#each containers as container (container.id)}
+				<ContainerGroup {container} {scale} onChange={updateContainer}>
+					{#each $nodes.filter( (n) => container.children.includes(n.id) ) as node (node.id)}
+						<NodeRenderer
+							{node}
+							{scale}
+							onChange={updateNode}
+							onDoubleClick={handleNodeDoubleClick}
+						/>
+					{/each}
+				</ContainerGroup>
+			{/each}
+			<!-- Render all unassigned nodes -->
+			{#each $nodes.filter((n) => !containers.some( (c) => c.children.includes(n.id) )) as node (node.id)}
+				<NodeRenderer
+					{node}
+					{scale}
+					onChange={updateNode}
+					onDoubleClick={handleNodeDoubleClick}
+				/>
+			{/each}
+		</Workspace>
 	</div>
+
+	<NodeDetailsModal bind:open={nodeModalOpen} node={selectedNode} />
+</div>
