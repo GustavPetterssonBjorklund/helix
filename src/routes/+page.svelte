@@ -7,10 +7,9 @@
 	// Google stuff
 	import SetDriveFileButton from '$lib/components/google-auth/SetDriveFileButton.svelte';
 
-	import type { WorkspaceState } from '$lib/types';
+	import type { WorkspaceState, AnyNode, ContainerNode } from '$lib/types';
 	import type { PageData } from './$types';
 	import { onMount } from 'svelte';
-	import type { Container, AnyNode } from '$lib/types';
 	import * as googleState from '$lib/stores/googleState';
 	import { nodes, setNodes } from '$lib/stores/nodes';
 	import { get } from 'svelte/store';
@@ -25,7 +24,6 @@
 	let selectedNode: AnyNode | null = null;
 
 	/* Workspace data */
-	let containers: Container[] = [];
 	let workspaceLoading = false;
 
 	/**
@@ -43,7 +41,6 @@
 			if (response.ok) {
 				const data = await response.json();
 				if (data.state) {
-					containers = data.state.containers;
 					setNodes(data.state.nodes);
 				}
 			}
@@ -54,24 +51,16 @@
 		}
 	}
 
-	function updateContainer({
-		id,
-		x,
-		y,
-		width,
-		height
-	}: {
-		id: string;
-		x: number;
-		y: number;
-		width: number;
-		height: number;
-	}) {
-		containers = containers.map((c) => (c.id === id ? { ...c, x, y, width, height } : c));
-	}
-
-	function updateNode({ id, x, y }: { id: string; x: number; y: number }) {
-		nodes.update((current) => current.map((n) => (n.id === id ? { ...n, x, y } : n)));
+	function updateNode({ id, x, y, width, height }: { id: string; x: number; y: number; width?: number; height?: number }) {
+		nodes.update((current) => 
+			current.map((n) => {
+				if (n.id !== id) return n;
+				if (n.type === 'container' && width !== undefined && height !== undefined) {
+					return { ...n, x, y, width, height };
+				}
+				return { ...n, x, y };
+			})
+		);
 	}
 
 	function handleNodeDoubleClick(node: AnyNode) {
@@ -113,7 +102,6 @@
 		saveOk = false;
 
 		const state: WorkspaceState = {
-			containers,
 			nodes: get(nodes)
 		};
 
@@ -153,6 +141,13 @@
 	onMount(async () => {
 		// If we have a persisted file id, load its workspace
 		await loadWorkspaceFromDrive(fileId);
+	});
+
+	// Separate containers from other nodes for rendering
+	$: containers = $nodes.filter((n): n is ContainerNode => n.type === 'container');
+	$: topLevelNodes = $nodes.filter((n) => {
+		// A node is top-level if it's not inside any container
+		return !containers.some(c => c.children.some(child => child.id === n.id));
 	});
 </script>
 
@@ -216,10 +211,27 @@
 
 	<!-- Workspace area -->
 	<div class="h-screen w-full">
+		<!-- Drawer with all nodes listed -->
+		<div
+			class="absolute right-0 top-12 z-10 h-[calc(100vh-3rem)] w-64 overflow-y-auto border-l border-slate-800 bg-slate-900 p-4"
+		>
+			<h2 class="mb-4 text-sm font-semibold text-slate-200">All Nodes</h2>
+			<div class="space-y-2">
+				{#each $nodes as node (node.id)}
+					<div
+						class="rounded border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-100 hover:bg-slate-700"
+					>
+						<div class="font-semibold">{node.name}</div>
+						<div class="text-slate-400">({node.type})</div>
+					</div>
+				{/each}
+			</div>
+		</div>
+
 		<Workspace bind:x bind:y let:scale loading={workspaceLoading}>
 			{#each containers as container (container.id)}
-				<ContainerGroup {container} {scale} onChange={updateContainer}>
-					{#each $nodes.filter( (n) => container.children.includes(n.id) ) as node (node.id)}
+				<ContainerGroup {container} {scale} onChange={updateNode}>
+					{#each container.children as node (node.id)}
 						<NodeRenderer
 							{node}
 							{scale}
@@ -229,8 +241,8 @@
 					{/each}
 				</ContainerGroup>
 			{/each}
-			<!-- Render all unassigned nodes -->
-			{#each $nodes.filter((n) => !containers.some( (c) => c.children.includes(n.id) )) as node (node.id)}
+			<!-- Render all top-level nodes (not in any container) -->
+			{#each topLevelNodes as node (node.id)}
 				<NodeRenderer
 					{node}
 					{scale}

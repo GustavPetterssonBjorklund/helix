@@ -17,11 +17,11 @@
 </script>
 
 <NodeComponent {node} {scale} {onChange} doubleClick={handleDoubleClick}>
-    {#if node.kind === "class"}
+    {#if node.type === "class"}
         <ClassNodeComponent {node} />
-    {:else if node.kind === "method"}
+    {:else if node.type === "method"}
         <MethodNodeComponent {node} />
-    {:else if node.kind === "property"}
+    {:else if node.type === "property"}
         <PropertyNodeComponent {node} />
     {/if}
 </NodeComponent>

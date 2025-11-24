@@ -1,42 +1,38 @@
-export type Container = {
-	id: string;
-	x: number;
-	y: number;
-	width: number;
-	height: number;
-	title?: string;
-	children: string[]; // ids of child containers
-};
-
 export type NodeBase = {
 	id: string;
+	name: string;
+	type: 'property' | 'method' | 'class' | 'container';
 	x: number;
 	y: number;
 };
 
 export type PropertyNode = NodeBase & {
-	kind: 'property';
-	propertyName: string;
-	propertyType: string;
+	type: 'property';
+	dataType: string;
 };
 
 export type MethodNode = NodeBase & {
-	kind: 'method';
-	methodName: string;
+	type: 'method';
 	parameters: string[];
 	returnType: string;
 };
 
 export type ClassNode = NodeBase & {
-	kind: 'class';
-	className: string;
+	type: 'class';
 	methods: MethodNode[];
 	properties: PropertyNode[];
 };
 
-export type AnyNode = PropertyNode | MethodNode | ClassNode;
+export type ContainerNode = NodeBase & {
+	type: 'container';
+	width: number;
+	height: number;
+	title?: string;
+	children: AnyNode[];
+};
+
+export type AnyNode = PropertyNode | MethodNode | ClassNode | ContainerNode;
 
 export type WorkspaceState = {
-	containers: Array<{} & Container>;
-	nodes: Array<{} & AnyNode>;
+	nodes: AnyNode[];
 };
